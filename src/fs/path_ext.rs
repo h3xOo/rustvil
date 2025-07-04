@@ -1,12 +1,15 @@
 use std::{
-    fs::{File, OpenOptions, create_dir, create_dir_all},
+    fs::{File, OpenOptions, create_dir, create_dir_all, remove_dir, remove_dir_all, remove_file},
     path::Path,
 };
 
+/// Options for controlling `PathExt::mkdir`.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum MkdirOptions {
-    Plain,
-    Parents,
+    /// Equivalent of `mkdir $path`.
+    WithoutParents,
+    /// Equivalent of `mkdir -p $path`.
+    WithParents,
 }
 
 pub trait PathExt {
@@ -23,11 +26,13 @@ pub trait PathExt {
     /// use std::path::PathBuf;
     /// # use rustvil::fs::path_ext::PathExt;
     /// # use std::error::Error;
+    /// # use std::fs::remove_file;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let buf = PathBuf::from("file.txt");
     /// let path = buf.as_path();
-    /// let _file = path.touch()?;
+    /// let file = path.touch()?;
+    /// # let _ = path.rm();
     /// # Ok(())
     /// # }
     /// ```
@@ -51,10 +56,20 @@ pub trait PathExt {
     /// let buf = PathBuf::from("a/b");
     /// let path = buf.as_path();
     /// path.mkdir(MkdirOptions::Parents)?;
+    /// # let _ = PathBuf::from("a").rmtree();
     /// # Ok(())
     /// # }
     /// ```
     fn mkdir(&self, opts: MkdirOptions) -> Result<(), std::io::Error>;
+
+    /// Wrapper around [`std::fs::remove_dir`](std::fs::remove_dir).
+    fn rmdir(&self) -> Result<(), std::io::Error>;
+
+    /// Wrapper around [`std::fs::remove_dir_all`](std::fs::remove_dir_all).
+    fn rmtree(&self) -> Result<(), std::io::Error>;
+
+    /// Wrapper around [`std::fs::remove_file`](std::fs::remove_file).
+    fn rm(&self) -> Result<(), std::io::Error>;
 }
 
 impl<T: AsRef<Path>> PathExt for T {
@@ -63,7 +78,7 @@ impl<T: AsRef<Path>> PathExt for T {
         let path = self.as_ref();
         fn inner(p: &Path) -> Result<File, std::io::Error> {
             if let Some(parent) = p.parent() {
-                mkdir_impl(parent, MkdirOptions::Parents)?;
+                mkdir_impl(parent, MkdirOptions::WithParents)?;
             }
             OpenOptions::new()
                 .read(true)
@@ -79,12 +94,24 @@ impl<T: AsRef<Path>> PathExt for T {
         let path = self.as_ref();
         mkdir_impl(path, opts)
     }
+
+    fn rmdir(&self) -> Result<(), std::io::Error> {
+        remove_dir(self)
+    }
+
+    fn rmtree(&self) -> Result<(), std::io::Error> {
+        remove_dir_all(self)
+    }
+
+    fn rm(&self) -> Result<(), std::io::Error> {
+        remove_file(self)
+    }
 }
 
 fn mkdir_impl(path: &Path, opts: MkdirOptions) -> Result<(), std::io::Error> {
     match opts {
-        MkdirOptions::Plain => Ok(create_dir(path)?),
-        MkdirOptions::Parents => Ok(create_dir_all(path)?),
+        MkdirOptions::WithoutParents => create_dir(path),
+        MkdirOptions::WithParents => create_dir_all(path),
     }
 }
 
@@ -109,21 +136,21 @@ mod tests {
             let mut new_file = tmp.path().to_path_buf();
             new_file.push("x");
             new_file.push("y");
-            assert_ok!(new_file.mkdir(MkdirOptions::Parents));
+            assert_ok!(new_file.mkdir(MkdirOptions::WithParents));
         }
 
         {
             let tmp = tempdir().expect("needed for tests");
             let mut new_file = tmp.path().to_path_buf();
             new_file.push("x");
-            assert_ok!(new_file.mkdir(MkdirOptions::Parents));
+            assert_ok!(new_file.mkdir(MkdirOptions::WithParents));
         }
 
         {
             let tmp = tempdir().expect("needed for tests");
             let mut new_file = tmp.path().to_path_buf();
             new_file.push("x");
-            assert_ok!(new_file.mkdir(MkdirOptions::Plain));
+            assert_ok!(new_file.mkdir(MkdirOptions::WithoutParents));
         }
 
         {
@@ -131,7 +158,7 @@ mod tests {
             let mut new_file = tmp.path().to_path_buf();
             new_file.push("x");
             new_file.push("y");
-            assert_err!(new_file.mkdir(MkdirOptions::Plain));
+            assert_err!(new_file.mkdir(MkdirOptions::WithoutParents));
         }
     }
 }
