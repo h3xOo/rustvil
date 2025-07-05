@@ -5,7 +5,7 @@ use thiserror::Error;
 
 /// Safe wrapper around [`std::env::vars_os`], which is safe to access on Windows: its
 /// environmental variables are case-insensitive.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Env {
     keys: HashMap<OsString, OsString>,
 
@@ -13,7 +13,7 @@ pub struct Env {
 }
 
 /// Errors encountered when getting environmental variable.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq, Hash)]
 pub enum EnvStrError {
     /// This variant indicates, that variable `Empty.0` is missing.
     #[error("there is no environmental variable `${0:?}`")]
@@ -83,7 +83,7 @@ impl Env {
         match self.keys.get(key) {
             Some(x) => Some(x),
             None => {
-                if cfg!(target_os = "windows") {
+                if cfg!(windows) {
                     self.normalised_keys
                         .get(&Env::normalize_key(key))
                         .map(|x| x.as_ref())

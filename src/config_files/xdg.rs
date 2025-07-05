@@ -4,16 +4,16 @@ use std::path::PathBuf;
 use crate::config_files::home;
 
 /// How macOS XDG should be treated.
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MacOSBehaviour {
     /// Use fallbacks in `~/Library/...`.
     UseLibrary,
-    /// Use fallbacks as Linux does, like `~/.config/...`.
+    /// Use fallbacks as Linux ones, like `~/.config/...`.
     LinuxFallback,
 }
 
 fn config_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
+    if cfg!(windows) {
         env.get("LOCALAPPDATA").ok().map(PathBuf::from)
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
@@ -30,7 +30,7 @@ fn config_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 }
 
 fn cache_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
+    if cfg!(windows) {
         env.get("LOCALAPPDATA").ok().map(|localappdata| {
             let mut buf = PathBuf::from(localappdata);
             buf.push("caches");
@@ -51,7 +51,7 @@ fn cache_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 }
 
 fn data_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
+    if cfg!(windows) {
         env.get("LOCALAPPDATA").ok().map(PathBuf::from)
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
@@ -69,7 +69,7 @@ fn data_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 }
 
 fn state_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
+    if cfg!(windows) {
         env.get("LOCALAPPDATA").ok().map(PathBuf::from)
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
