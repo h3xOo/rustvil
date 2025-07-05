@@ -13,7 +13,7 @@ pub struct Env {
 }
 
 /// Errors encountered when getting environmental variable.
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum EnvStrError {
     /// This variant indicates, that variable `Empty.0` is missing.
     #[error("there is no environmental variable `${0:?}`")]
@@ -94,6 +94,11 @@ impl Env {
         }
     }
 
+    /// Check, whether this `Env` has key `key`.
+    pub fn has(&self, key: impl AsRef<OsStr>) -> bool {
+        self.get_os(key).is_some()
+    }
+
     /// Get environmental variable pointed by `key` and convert it to UTF-8.
     ///
     /// # Arguments
@@ -122,10 +127,65 @@ impl Env {
             .to_str()
             .ok_or_else(|| EnvStrError::NonUTF8(key.to_os_string()))
     }
+
+    fn from_iter<I: Iterator<Item = (OsString, OsString)>>(t: I) -> Self {
+        let mut keys = HashMap::new();
+        let mut normalised_keys = HashMap::new();
+        for (key, value) in t {
+            normalised_keys.insert(Self::normalize_key(&key), value.clone());
+            keys.insert(key, value);
+        }
+        Self {
+            keys,
+            normalised_keys,
+        }
+    }
 }
 
 impl Default for Env {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl FromIterator<(OsString, OsString)> for Env {
+    fn from_iter<T: IntoIterator<Item = (OsString, OsString)>>(iter: T) -> Self {
+        // FIXME: This could be smarter, as we could build both HashMaps at the same time.
+        Self::from_iter(iter.into_iter())
+    }
+}
+
+impl<const N: usize> From<[(OsString, OsString); N]> for Env {
+    fn from(value: [(OsString, OsString); N]) -> Self {
+        <Self as FromIterator<(OsString, OsString)>>::from_iter(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn make_dummy_env() -> Env {
+        Env::from([(OsString::from("ala"), OsString::from("bar"))])
+    }
+
+    #[test]
+    fn basic_test() {
+        let env = make_dummy_env();
+        assert!(env.has("ala"));
+        assert_eq!(env.get_os("ala"), Some(OsStr::new("bar")));
+        assert_eq!(env.get("ala"), Ok("bar"));
+        if cfg!(windows) {
+            assert!(env.has("aLA"));
+            assert_eq!(env.get_os("aLA"), Some(OsStr::new("bar")));
+            assert_eq!(env.get("aLA"), Ok("bar"));
+        } else {
+            assert!(!env.has("aLA"));
+            assert_eq!(env.get_os("aLA"), None);
+            assert_eq!(
+                env.get("aLA"),
+                Err(EnvStrError::Missing(OsString::from("aLA")))
+            );
+        }
     }
 }
