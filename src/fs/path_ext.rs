@@ -55,7 +55,7 @@ pub trait PathExt {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let buf = PathBuf::from("a/b");
     /// let path = buf.as_path();
-    /// path.mkdir(MkdirOptions::Parents)?;
+    /// path.mkdir(MkdirOptions::WithParents)?;
     /// # let _ = PathBuf::from("a").rmtree();
     /// # Ok(())
     /// # }
