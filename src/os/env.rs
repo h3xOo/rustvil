@@ -3,13 +3,14 @@ use std::ffi::{OsStr, OsString};
 
 use thiserror::Error;
 
-/// Safe wrapper around [`std::env::vars_os`], which is safe to access on Windows: its
+/// Safe wrapper around [`std::env::vars_os`], which is safe to access on Windows: some of its
 /// environmental variables are case-insensitive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Env {
-    keys: HashMap<OsString, OsString>,
+    env: HashMap<OsString, OsString>,
 
-    normalised_keys: HashMap<OsString, OsString>,
+    // Map from normalised keys (uppercase) to original.
+    normalised_keys: HashMap<String, String>,
 }
 
 /// Errors encountered when getting environmental variable.
@@ -30,27 +31,26 @@ impl Env {
         Self::new_from(std::env::vars_os().collect())
     }
 
-    /// Create new [`Env`] using `keys` as existing environmental variables.
+    /// Create new [`Env`] using `env` as existing environmental variables.
     pub fn new_from(env: HashMap<OsString, OsString>) -> Self {
+        let normalised_keys = Env::normalize_keys(&env);
         Self {
-            keys: env.clone(),
-            normalised_keys: Env::normalize_map(env),
+            env,
+            normalised_keys,
         }
     }
 
-    fn normalize_key(key: impl AsRef<OsStr>) -> OsString {
-        key.as_ref().to_ascii_uppercase()
-    }
-    fn normalize_map(keys: HashMap<OsString, OsString>) -> HashMap<OsString, OsString> {
-        keys.into_iter()
-            .map(|(key, value)| (Env::normalize_key(key), value))
+    fn normalize_keys(keys: &HashMap<OsString, OsString>) -> HashMap<String, String> {
+        keys.keys()
+            .filter_map(|k| k.to_str())
+            .map(|k| (k.to_uppercase(), k.to_owned()))
             .collect()
     }
 
     /// Reload environmental variables from `env`.
     pub fn reload_from(&mut self, env: HashMap<OsString, OsString>) {
-        let normalised = Env::normalize_map(env.clone());
-        self.keys = env;
+        let normalised = Env::normalize_keys(&env);
+        self.env = env;
         self.normalised_keys = normalised;
     }
 
@@ -80,18 +80,22 @@ impl Env {
     /// ```
     pub fn get_os(&self, key: impl AsRef<OsStr>) -> Option<&OsStr> {
         let key = key.as_ref();
-        match self.keys.get(key) {
+        match self.env.get(key) {
             Some(x) => Some(x),
             None => {
                 if cfg!(windows) {
-                    self.normalised_keys
-                        .get(&Env::normalize_key(key))
-                        .map(|x| x.as_ref())
+                    self.get_normalised(key)
                 } else {
                     None
                 }
             }
         }
+    }
+
+    fn get_normalised(&self, key: &OsStr) -> Option<&OsStr> {
+        let k = key.to_str()?.to_uppercase();
+        let env_key: &OsStr = self.normalised_keys.get(&k)?.as_ref();
+        self.env.get(env_key).map(|v| v.as_ref())
     }
 
     /// Check, whether this `Env` has key `key`.
@@ -129,14 +133,16 @@ impl Env {
     }
 
     fn from_iter<I: Iterator<Item = (OsString, OsString)>>(t: I) -> Self {
-        let mut keys = HashMap::new();
+        let mut env = HashMap::new();
         let mut normalised_keys = HashMap::new();
         for (key, value) in t {
-            normalised_keys.insert(Self::normalize_key(&key), value.clone());
-            keys.insert(key, value);
+            if let Some(key) = key.to_str() {
+                normalised_keys.insert(key.to_uppercase(), key.to_owned());
+            }
+            env.insert(key, value);
         }
         Self {
-            keys,
+            env,
             normalised_keys,
         }
     }
@@ -150,7 +156,6 @@ impl Default for Env {
 
 impl FromIterator<(OsString, OsString)> for Env {
     fn from_iter<T: IntoIterator<Item = (OsString, OsString)>>(iter: T) -> Self {
-        // FIXME: This could be smarter, as we could build both HashMaps at the same time.
         Self::from_iter(iter.into_iter())
     }
 }
