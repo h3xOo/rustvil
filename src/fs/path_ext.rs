@@ -12,7 +12,14 @@ pub enum MkdirOptions {
     WithParents,
 }
 
-pub trait PathExt {
+mod sealed {
+    use std::path::Path;
+
+    pub trait Sealed {}
+    impl<T> Sealed for T where T: AsRef<Path> {}
+}
+
+pub trait PathExt: sealed::Sealed {
     /// Touch file and its parent directories.
     ///
     /// # Returns
