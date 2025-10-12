@@ -3,6 +3,7 @@ use std::collections::HashMap;
 pub type SignalHandler = extern "C" fn(libc::c_int);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Safe wrapper around general libc signal.
 pub struct SignalKind(libc::c_int);
 
 macro_rules! impl_signal_delegates {
@@ -21,6 +22,7 @@ macro_rules! impl_signal_delegates {
 }
 
 impl SignalKind {
+    /// Return raw [`c_int`](libc::c_int) stored in `self`.
     pub const fn as_raw(&self) -> libc::c_int {
         self.0
     }
@@ -81,16 +83,22 @@ impl From<libc::c_int> for SignalKind {
     }
 }
 
+/// RAII guard for temporarily changing signal handlers.
+/// Old handlers are restored on [`Drop`].
+///
+/// Built on top of [`libc::signal`].
 pub struct SignalGuard {
     // SAFETY: For each entry holds, that `V` was created by `libc::signal(K, *new handler*)`.
     stashed_signals: HashMap<SignalKind, libc::sighandler_t>,
 }
 
 impl SignalGuard {
+    /// Create [`SignalGuard`], which swaps signals from `signals` to [`SIG_IGN`](libc::SIG_IGN).
     pub fn ignore(signals: impl Iterator<Item = SignalKind>) -> Self {
         Self::new_impl_with_fallback(signals, None, libc::SIG_IGN as libc::sighandler_t)
     }
 
+    /// Create [`SignalGuard`], which swaps signals from `signals` to [`SIG_DFL`](libc::SIG_DFL).
     pub fn default(signals: impl Iterator<Item = SignalKind>) -> Self {
         Self::new_impl_with_fallback(signals, None, libc::SIG_DFL as libc::sighandler_t)
     }

@@ -63,10 +63,10 @@ impl Env {
     ///
     /// # Arguments
     ///
-    /// * `key` - key for environmental variable. Must implement `AsRef<OsStr>`.
+    /// * `key` - key for environmental variable. Must implement [`AsRef<OsStr>`].
     ///
     /// # Returns
-    /// `Option<&OsStr>`. `None` variant indicates missing key, `Some`: existing key.
+    /// [`Option<&OsStr>`]. [`None`] variant indicates missing key, [`Some`]: existing key.
     ///
     /// # Examples
     /// ```rust
@@ -98,7 +98,7 @@ impl Env {
         self.env.get(env_key).map(|v| v.as_ref())
     }
 
-    /// Check, whether this `Env` has key `key`.
+    /// Check, whether this [`Env`] has key `key`.
     pub fn has(&self, key: impl AsRef<OsStr>) -> bool {
         self.get_os(key).is_some()
     }
@@ -107,11 +107,11 @@ impl Env {
     ///
     /// # Arguments
     ///
-    /// * `key` - key for environmental variable. Must implement `AsRef<Str>`.
+    /// * `key` - key for environmental variable. Must implement [`AsRef<Str>`].
     ///
     /// # Returns
-    /// `Result<&str, EnvStrError>`. `Ok` variant indicates existing UTF-8 variable, `Err`
-    /// indicates some kind of error. See [`EnvStrError`](rustvil::os::env::EnvStrError) for
+    /// [`Result<&str, EnvStrError>`]. [`Ok`] variant indicates existing UTF-8 variable, [`Err`]
+    /// indicates some kind of error. See [`EnvStrError`] for
     /// details.
     ///
     /// # Examples

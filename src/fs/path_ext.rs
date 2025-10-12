@@ -29,7 +29,7 @@ impl DerefMut for FileLockGuard {
     }
 }
 
-/// Options for controlling [`PathExt::mkdir`](PathExt::mkdir).
+/// Options for controlling [`PathExt::mkdir`]
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum MkdirOptions {
     /// Equivalent of `mkdir $path`.
@@ -45,7 +45,7 @@ mod sealed {
     impl Sealed for Path {}
 }
 
-/// Whether [`PathExt::lock`](PathExt::lock)/[`PathExt::lock_shared`](PathExt::lock_shared) should block current thread.
+/// Whether [`PathExt::lock`]/[`PathExt::lock_shared`] should block current thread.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum ShouldBlock {
     No,
@@ -57,8 +57,7 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// # Returns
     /// [`Ok(File)`](std::fs::File) if created successfully, otherwise error, as reported by
-    /// [`PathExt::mkdir`](PathExt::mkdir), or
-    /// [`OpenOptions::open`](std::fs::OpenOptions::open).
+    /// [`PathExt::mkdir`] or [`OpenOptions::open`].
     ///
     /// # Examples
     ///
@@ -78,12 +77,11 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn touch(&self) -> io::Result<File>;
 
-    /// Create directories at given [`Path`](std::path::Path).
+    /// Create directories at given [`Path`].
     ///
     /// # Returns
-    /// `Ok(())` if created successfully, otherwise error, as reported by
-    /// [`create_dir`](std::fs::create_dir), or
-    /// [`create_dir_all`](std::fs::create_dir_all).
+    /// [`Ok(())`](Ok) if created successfully, otherwise error, as reported by
+    /// [`create_dir`], or [`create_dir_all`].
     ///
     /// # Examples
     ///
@@ -102,65 +100,18 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn mkdir(&self, opts: MkdirOptions) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_dir`](std::fs::remove_dir).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::{PathExt, MkdirOptions};
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let buf = PathBuf::from("empty_dir");
-    /// let path = buf.as_path();
-    /// path.mkdir(MkdirOptions::WithoutParents)?;
-    /// path.rmdir()?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Wrapper around [`std::fs::remove_dir`].
     fn rmdir(&self) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_dir_all`](std::fs::remove_dir_all).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::{PathExt, MkdirOptions};
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let buf = PathBuf::from("a/b/c");
-    /// let path = buf.as_path();
-    /// path.mkdir(MkdirOptions::WithParents)?;
-    /// let root = PathBuf::from("a");
-    /// root.rmtree()?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Wrapper around [`std::fs::remove_dir_all`].
     fn rmtree(&self) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_file`](std::fs::remove_file).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::PathExt;
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let buf = PathBuf::from("file.txt");
-    /// let path = buf.as_path();
-    /// path.touch()?;
-    /// path.rm()?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Wrapper around [`std::fs::remove_file`].
     fn rm(&self) -> io::Result<()>;
 
     /// Locks exclusively `self`, creating file if needed.
+    ///
+    /// This is essentially [`self.touch()?`](PathExt::touch) followed by [`File::lock`]/[`File::try_lock`], with RAII bloat.
     ///
     /// # Returns
     /// [`Ok(FileLockGuard)`](FileLockGuard) on success.
@@ -176,12 +127,10 @@ pub trait PathExt: sealed::Sealed {
     /// let buf = PathBuf::from("lockfile.lock");
     /// let path = buf.as_path();
     ///
-    /// // Acquire exclusive lock (blocking)
     /// let lock = path.lock(ShouldBlock::Yes)?;
     /// // Critical section...
-    /// drop(lock); // Release lock
+    /// drop(lock);
     ///
-    /// // Try to acquire lock without blocking
     /// let lock = path.lock(ShouldBlock::No)?;
     /// drop(lock);
     /// # let _ = path.rm();
@@ -192,6 +141,8 @@ pub trait PathExt: sealed::Sealed {
 
     /// Locks shared `self`, creating file if needed.
     ///
+    /// This is essentially [`self.touch()?`](PathExt::touch) followed by [`File::lock_shared`]/[`File::try_lock_shared`], with RAII bloat.
+    ///
     /// # Returns
     /// [`Ok(FileLockGuard)`](FileLockGuard) on success.
     ///
@@ -206,9 +157,7 @@ pub trait PathExt: sealed::Sealed {
     /// let buf = PathBuf::from("lockfile.lock");
     /// let path = buf.as_path();
     ///
-    /// // Acquire shared lock (blocking)
     /// let lock1 = path.lock_shared(ShouldBlock::Yes)?;
-    /// // Multiple shared locks can coexist
     /// let lock2 = path.lock_shared(ShouldBlock::No)?;
     /// drop(lock1);
     /// drop(lock2);
@@ -223,13 +172,7 @@ impl PathExt for Path {
     // FIXME: Take `OpenOptions` as a parameter?
     fn touch(&self) -> io::Result<File> {
         if let Some(parent) = self.parent() {
-            {
-                let opts = MkdirOptions::WithParents;
-                match opts {
-                    MkdirOptions::WithoutParents => create_dir(parent),
-                    MkdirOptions::WithParents => create_dir_all(parent),
-                }
-            }?;
+            parent.mkdir(MkdirOptions::WithParents)?;
         }
         let mut opts = OpenOptions::new();
         opts.read(true).write(true).create(true).truncate(false);
