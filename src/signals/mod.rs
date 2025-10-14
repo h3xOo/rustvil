@@ -1,3 +1,8 @@
+//! Signal handling utilities with RAII guards.
+//!
+//! Provides safe wrappers around libc signals with [`SignalKind`] for signal types
+//! and [`SignalGuard`] for temporary signal handler management.
+
 use std::collections::HashMap;
 
 pub type SignalHandler = extern "C" fn(libc::c_int);

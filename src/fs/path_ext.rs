@@ -1,3 +1,8 @@
+//! Extension trait for [`Path`] with additional filesystem operations.
+//!
+//! Provides [`PathExt`] trait with convenient methods for file/directory operations,
+//! file locking, and cross-platform executable detection.
+
 use std::{
     fs::{
         File, Metadata, OpenOptions, create_dir, create_dir_all, metadata, remove_dir,
