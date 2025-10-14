@@ -95,7 +95,7 @@ impl Env {
     fn get_normalised(&self, key: &OsStr) -> Option<&OsStr> {
         let k = key.to_str()?.to_uppercase();
         let env_key: &OsStr = self.normalised_keys.get(&k)?.as_ref();
-        self.env.get(env_key).map(|v| v.as_ref())
+        self.env.get(env_key).map(OsString::as_ref)
     }
 
     /// Check, whether this [`Env`] has key `key`.
