@@ -99,12 +99,18 @@ pub struct SignalGuard {
 
 impl SignalGuard {
     /// Create [`SignalGuard`], which swaps signals from `signals` to [`SIG_IGN`](libc::SIG_IGN).
-    pub fn ignore(signals: impl Iterator<Item = SignalKind>) -> Self {
+    /// Note that some systems disallow overwriting signals, in that case `None` variant is
+    /// returned (when [`libc::signal`] returns [`SIG_ERR`](libc::SIG_ERR)), otherwise it is `Some`
+    /// variant.
+    pub fn ignore(signals: impl Iterator<Item = SignalKind>) -> Option<Self> {
         Self::new_impl_with_fallback(signals, None, libc::SIG_IGN as libc::sighandler_t)
     }
 
     /// Create [`SignalGuard`], which swaps signals from `signals` to [`SIG_DFL`](libc::SIG_DFL).
-    pub fn default(signals: impl Iterator<Item = SignalKind>) -> Self {
+    /// Note that some systems disallow overwriting signals, in that case `None` variant is
+    /// returned (when [`libc::signal`] returns [`SIG_ERR`](libc::SIG_ERR)), otherwise it is `Some`
+    /// variant.
+    pub fn default(signals: impl Iterator<Item = SignalKind>) -> Option<Self> {
         Self::new_impl_with_fallback(signals, None, libc::SIG_DFL as libc::sighandler_t)
     }
 
@@ -112,7 +118,7 @@ impl SignalGuard {
         signals: impl Iterator<Item = SignalKind>,
         keys: Option<&HashMap<SignalKind, SignalHandler>>,
         fallback: libc::sighandler_t,
-    ) -> Self {
+    ) -> Option<Self> {
         let get_signal_for = |kind| {
             let Some(keys) = keys else { return fallback };
             keys.get(&kind)
@@ -124,10 +130,21 @@ impl SignalGuard {
         let mut stashed_signals = HashMap::new();
         for signal in signals {
             let new_handler = get_signal_for(signal);
+            // SAFETY: As per: https://en.cppreference.com/w/c/program/signal.html.
+            // 1. `signal` is a `SignalKind`, and it can only be created with valid raw SIGNUM
+            //    inside, so `.as_raw()` returns a valid signal.
+            // 2. `new_handler` is either a `SIG_DFL` or a `SIG_IGN`, hence it's valid to put it as
+            //    signal handler.
             let old_handler = unsafe { libc::signal(signal.as_raw(), new_handler) };
+            // Returns:
+            //   Previous signal handler on success or SIG_ERR on failure (setting a signal handler can be disabled on some implementations).
+            if old_handler == libc::SIG_ERR {
+                return None;
+            }
+            // Otherwise `old_handler` is valid signal handler.
             stashed_signals.insert(signal, old_handler);
         }
-        Self { stashed_signals }
+        Some(Self { stashed_signals })
     }
 }
 
@@ -135,7 +152,7 @@ impl Drop for SignalGuard {
     fn drop(&mut self) {
         for (signal, action) in self.stashed_signals.iter() {
             // SAFETY: Since action was created by previous call to `libc::signal`, it's safe to
-            // restore it.
+            // restore it, and by `Self` invariant.
             let _ = unsafe { libc::signal(signal.as_raw() as libc::c_int, *action) };
         }
     }
