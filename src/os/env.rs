@@ -1,3 +1,8 @@
+//! Cross-platform environment variable handling.
+//!
+//! Provides [`Env`] for safe access to environment variables with proper handling
+//! of Windows case-insensitive variables.
+
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 

@@ -1,3 +1,8 @@
+//! XDG Base Directory Specification support.
+//!
+//! Implements cross-platform path resolution following the XDG Base Directory spec,
+//! with platform-specific fallbacks for Windows and macOS.
+
 use crate::os::env::Env;
 use std::path::PathBuf;
 
