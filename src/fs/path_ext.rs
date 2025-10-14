@@ -21,7 +21,9 @@ pub struct FileLockGuard {
 }
 
 impl Drop for FileLockGuard {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        drop(self.file.unlock())
+    }
 }
 
 impl Deref for FileLockGuard {
