@@ -102,16 +102,24 @@ impl SignalGuard {
     /// Note that some systems disallow overwriting signals, in that case `None` variant is
     /// returned (when [`libc::signal`] returns [`SIG_ERR`](libc::SIG_ERR)), otherwise it is `Some`
     /// variant.
-    pub fn ignore(signals: impl Iterator<Item = SignalKind>) -> Option<Self> {
-        Self::new_impl_with_fallback(signals, None, libc::SIG_IGN as libc::sighandler_t)
+    pub fn ignore(signals: impl IntoIterator<Item = SignalKind>) -> Option<Self> {
+        Self::new_impl_with_fallback(
+            signals.into_iter(),
+            None,
+            libc::SIG_IGN as libc::sighandler_t,
+        )
     }
 
     /// Create [`SignalGuard`], which swaps signals from `signals` to [`SIG_DFL`](libc::SIG_DFL).
     /// Note that some systems disallow overwriting signals, in that case `None` variant is
     /// returned (when [`libc::signal`] returns [`SIG_ERR`](libc::SIG_ERR)), otherwise it is `Some`
     /// variant.
-    pub fn default(signals: impl Iterator<Item = SignalKind>) -> Option<Self> {
-        Self::new_impl_with_fallback(signals, None, libc::SIG_DFL as libc::sighandler_t)
+    pub fn default(signals: impl IntoIterator<Item = SignalKind>) -> Option<Self> {
+        Self::new_impl_with_fallback(
+            signals.into_iter(),
+            None,
+            libc::SIG_DFL as libc::sighandler_t,
+        )
     }
 
     fn new_impl_with_fallback(
