@@ -1,5 +1,8 @@
 use std::{
-    fs::{File, OpenOptions, create_dir, create_dir_all, remove_dir, remove_dir_all, remove_file},
+    fs::{
+        File, Metadata, OpenOptions, create_dir, create_dir_all, metadata, remove_dir,
+        remove_dir_all, remove_file,
+    },
     io,
     ops::{Deref, DerefMut},
     path::Path,
@@ -166,6 +169,12 @@ pub trait PathExt: sealed::Sealed {
     /// # }
     /// ```
     fn lock_shared(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard>;
+
+    /// Returns `true` if path exists on a disk and points to an executable file.
+    fn is_executable(&self) -> bool;
+
+    /// Wrapper around [`std::fs::metadata`].
+    fn metadata(&self) -> io::Result<Metadata>;
 }
 
 impl PathExt for Path {
@@ -232,6 +241,34 @@ impl PathExt for Path {
             })
         };
         result.map(|_| FileLockGuard { file })
+    }
+
+    #[cfg(unix)]
+    fn is_executable(&self) -> bool {
+        use std::os::unix::prelude::*;
+        self.metadata()
+            .map(|metadata| {
+                // Note: This should be the same as 0o111.
+                const EXEC_MASK: u32 = (libc::S_IXUSR | libc::S_IXGRP | libc::S_IXOTH) as u32;
+                const _: () = assert!(EXEC_MASK == 0o111, "bits mismatch");
+                metadata.is_file() && metadata.permissions().mode() & EXEC_MASK != 0
+            })
+            .unwrap_or(false)
+    }
+
+    #[cfg(windows)]
+    fn is_executable(&self) -> bool {
+        self.is_file()
+    }
+
+    // TODO: Implement.
+    #[cfg(not(any(unix, windows)))]
+    fn is_executable(&self) -> bool {
+        false
+    }
+
+    fn metadata(&self) -> io::Result<Metadata> {
+        metadata(self)
     }
 }
 
