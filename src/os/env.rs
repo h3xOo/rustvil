@@ -1,7 +1,29 @@
-//! Cross-platform environment variable handling.
-//!
-//! Provides [`Env`] for safe access to environment variables with proper handling
-//! of Windows case-insensitive variables.
+//! Cross-platform environment variables snapshot.
+//! 
+//! ## Examples
+//! 
+//! ```rust,no_run
+//! # use rustvil::os::env::Env;
+//! # use std::ffi::OsStr;
+//! let env = Env::new();
+//! 
+//! // Get some variable
+//! let foo = env.get_os("FOO").unwrap_or(OsStr::new("empty"));
+//! 
+//! // String getters also exist.
+//! let bar = env.get("BAR").unwrap_or("empty");
+//! ```
+//! 
+//! You can also _reload_ it:
+//! ```rust,no_run
+//! # use rustvil::os::env::Env;
+//! let mut env = Env::new();
+//! 
+//! let x = env.get("X"); // Maybe `Err`.
+//! unsafe { std::env::set_var("X", "Y"); }
+//! env.reload();
+//! let x = env.get("X"); // Now it should be `Some("Y")`.
+//! ```
 
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
@@ -21,11 +43,11 @@ pub struct Env {
 /// Errors encountered when getting environmental variable.
 #[derive(Debug, Clone, Error, PartialEq, Eq, Hash)]
 pub enum EnvStrError {
-    /// This variant indicates, that variable `Empty.0` is missing.
+    /// This variant indicates, that variable `Missing.0` is missing.
     #[error("there is no environmental variable `${0:?}`")]
     Missing(OsString),
 
-    /// This variant indicates, that variable `$NonUTF8.0` is not an UTF-8 string.
+    /// This variant indicates, that variable `NonUTF8.0` is not an UTF-8 string.
     #[error("environmental variable `${0:?}` is not an UTF-8 string")]
     NonUTF8(OsString),
 }
@@ -74,14 +96,10 @@ impl Env {
     /// [`Option<&OsStr>`]. [`None`] variant indicates missing key, [`Some`]: existing key.
     ///
     /// # Examples
-    /// ```rust
-    /// use rustvil::os::env::Env;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// ```rust,no_run
+    /// # use rustvil::os::env::Env;
     /// let env = Env::new();
     /// println!("$FOO = {:?}", env.get_os("FOO"));
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn get_os(&self, key: impl AsRef<OsStr>) -> Option<&OsStr> {
         let key = key.as_ref();
@@ -120,9 +138,8 @@ impl Env {
     /// details.
     ///
     /// # Examples
-    /// ```rust
-    /// use rustvil::os::env::Env;
-    ///
+    /// ```rust,no_run
+    /// # use rustvil::os::env::Env;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env = Env::new();
     /// let _path = env.get("PATH")?;

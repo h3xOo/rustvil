@@ -1,8 +1,3 @@
-//! Extension trait for [`Path`] with additional filesystem operations.
-//!
-//! Provides [`PathExt`] trait with convenient methods for file/directory operations,
-//! file locking, and cross-platform executable detection.
-
 use std::{
     fs::{
         File, Metadata, OpenOptions, Permissions, ReadDir, canonicalize, copy, create_dir,
@@ -56,13 +51,37 @@ mod sealed {
     impl Sealed for Path {}
 }
 
-/// Whether [`PathExt::lock`]/[`PathExt::lock_shared`] should block current thread.
+/// Whether [`PathExt::lock`]/[`PathExt::lock_shared`] should block the current thread.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum ShouldBlock {
     No,
     Yes,
 }
 
+/// Extension trait for [`Path`] with additional filesystem operations.
+///
+/// Most of it are [`std::fs`] wrappers, changing from functional to OOP style, but there are some
+/// interesting methods.
+/// 
+/// ```rust,no_run
+/// # use rustvil::fs::*;
+/// # use std::path::Path;
+/// # fn get_path() -> ! { loop {} }
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let path: &Path = get_path();
+/// // Now you can do extra things like:
+/// let _file = path.touch()?; // Creates file and its parent directories.
+/// path.rm()?;
+/// path.mkdir(MkdirOptions::WithParents)?;
+/// 
+/// // You can also lock the file, to prevent races (even across different processes)
+/// let _guard = path.lock(ShouldBlock::Yes)?;
+/// // ...
+/// drop(_guard);
+/// // Cleanup created files.
+/// path.rmtree()?;
+/// # Ok(())
+/// # }
 pub trait PathExt: sealed::Sealed {
     /// Touch file and its parent directories.
     ///
@@ -72,17 +91,13 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::PathExt;
-    /// # use std::error::Error;
-    /// # use std::fs::remove_file;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// ```rust,no_run
+    /// # use rustvil::fs::PathExt;
+    /// # use std::path::PathBuf;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buf = PathBuf::from("file.txt");
     /// let path = buf.as_path();
     /// let file = path.touch()?;
-    /// # let _ = path.rm();
     /// # Ok(())
     /// # }
     /// ```
@@ -96,29 +111,17 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::{PathExt, MkdirOptions};
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// ```rust,no_run
+    /// # use rustvil::fs::*;
+    /// # use std::path::PathBuf;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buf = PathBuf::from("a/b");
     /// let path = buf.as_path();
     /// path.mkdir(MkdirOptions::WithParents)?;
-    /// # let _ = PathBuf::from("a").rmtree();
     /// # Ok(())
     /// # }
     /// ```
     fn mkdir(&self, opts: MkdirOptions) -> io::Result<()>;
-
-    /// Wrapper around [`std::fs::remove_dir`].
-    fn rmdir(&self) -> io::Result<()>;
-
-    /// Wrapper around [`std::fs::remove_dir_all`].
-    fn rmtree(&self) -> io::Result<()>;
-
-    /// Wrapper around [`std::fs::remove_file`].
-    fn rm(&self) -> io::Result<()>;
 
     /// Locks exclusively `self`, creating file if needed.
     ///
@@ -129,12 +132,10 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::{PathExt, ShouldBlock};
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// ```rust,no_run
+    /// # use rustvil::fs::*;
+    /// # use std::path::PathBuf;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buf = PathBuf::from("lockfile.lock");
     /// let path = buf.as_path();
     ///
@@ -144,7 +145,6 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// let lock = path.lock(ShouldBlock::No)?;
     /// drop(lock);
-    /// # let _ = path.rm();
     /// # Ok(())
     /// # }
     /// ```
@@ -159,12 +159,11 @@ pub trait PathExt: sealed::Sealed {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// # use rustvil::fs::path_ext::{PathExt, ShouldBlock};
-    /// # use std::error::Error;
-    ///
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// ```rust,no_run
+    /// # use rustvil::fs::*;
+    /// # use std::path::PathBuf;
+    /// # use std::path::Path;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let buf = PathBuf::from("lockfile.lock");
     /// let path = buf.as_path();
     ///
@@ -172,17 +171,16 @@ pub trait PathExt: sealed::Sealed {
     /// let lock2 = path.lock_shared(ShouldBlock::No)?;
     /// drop(lock1);
     /// drop(lock2);
-    /// # let _ = path.rm();
     /// # Ok(())
     /// # }
     /// ```
     fn lock_shared(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard>;
 
     /// Returns `true` if path exists on a disk and points to an executable file.
+    ///
+    /// Current implementation only considers `unix` and `windows` cfg's, any other always returns
+    /// `false`.
     fn is_executable(&self) -> bool;
-
-    /// Wrapper around [`std::fs::metadata`].
-    fn metadata(&self) -> io::Result<Metadata>;
 
     /// Wrapper around [`std::fs::canonicalize`].
     fn canonicalize(&self) -> io::Result<PathBuf>;
@@ -195,6 +193,9 @@ pub trait PathExt: sealed::Sealed {
 
     /// Wrapper around [`std::fs::hard_link`].
     fn hard_link_to(&self, to: impl AsRef<Path>) -> io::Result<()>;
+
+    /// Wrapper around [`std::fs::metadata`].
+    fn metadata(&self) -> io::Result<Metadata>;
 
     /// Wrapper around [`std::fs::read`].
     fn read(&self) -> io::Result<Vec<u8>>;
@@ -211,14 +212,23 @@ pub trait PathExt: sealed::Sealed {
     /// Wrapper around [`std::fs::rename`].
     fn rename_to(&self, to: impl AsRef<Path>) -> io::Result<()>;
 
+    /// Wrapper around [`std::fs::remove_file`].
+    fn rm(&self) -> io::Result<()>;
+
+    /// Wrapper around [`std::fs::remove_dir`].
+    fn rmdir(&self) -> io::Result<()>;
+
+    /// Wrapper around [`std::fs::remove_dir_all`].
+    fn rmtree(&self) -> io::Result<()>;
+
     /// Wrapper around [`std::fs::set_permissions`].
-    fn set_permissions(&self, p: Permissions) -> io::Result<()>;
+    fn set_permissions(&self, permissions: Permissions) -> io::Result<()>;
 
     /// Wrapper around [`std::fs::symlink_metadata`].
     fn symlink_metadata(&self) -> io::Result<Metadata>;
 
     /// Wrapper around [`std::fs::write`].
-    fn write(&self, content: impl AsRef<[u8]>) -> io::Result<()>;
+    fn write(&self, contents: impl AsRef<[u8]>) -> io::Result<()>;
 }
 
 impl PathExt for Path {
@@ -247,18 +257,6 @@ impl PathExt for Path {
             MkdirOptions::WithoutParents => create_dir(self),
             MkdirOptions::WithParents => create_dir_all(self),
         }
-    }
-
-    fn rmdir(&self) -> io::Result<()> {
-        remove_dir(self)
-    }
-
-    fn rmtree(&self) -> io::Result<()> {
-        remove_dir_all(self)
-    }
-
-    fn rm(&self) -> io::Result<()> {
-        remove_file(self)
     }
 
     fn lock(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard> {
@@ -311,10 +309,6 @@ impl PathExt for Path {
         false
     }
 
-    fn metadata(&self) -> io::Result<Metadata> {
-        metadata(self)
-    }
-
     fn canonicalize(&self) -> io::Result<PathBuf> {
         canonicalize(self)
     }
@@ -329,6 +323,10 @@ impl PathExt for Path {
 
     fn hard_link_to(&self, to: impl AsRef<Path>) -> io::Result<()> {
         hard_link(self, to)
+    }
+
+    fn metadata(&self) -> io::Result<Metadata> {
+        metadata(self)
     }
 
     fn read(&self) -> io::Result<Vec<u8>> {
@@ -349,6 +347,18 @@ impl PathExt for Path {
 
     fn rename_to(&self, to: impl AsRef<Path>) -> io::Result<()> {
         rename(self, to)
+    }
+
+    fn rm(&self) -> io::Result<()> {
+        remove_file(self)
+    }
+
+    fn rmdir(&self) -> io::Result<()> {
+        remove_dir(self)
+    }
+
+    fn rmtree(&self) -> io::Result<()> {
+        remove_dir_all(self)
     }
 
     fn set_permissions(&self, permissions: Permissions) -> io::Result<()> {

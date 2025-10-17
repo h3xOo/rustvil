@@ -1,7 +1,11 @@
 //! Rustvil - A collection of various Rust utilities.
 //!
-//! This crate provides cross-platform utilities for filesystem operations, OS-level
-//! interactions, configuration file management, and signal handling.
+//! Look at documentation of each submodule for more verbose documentation.
+//!
+//! ## Rationalize
+//!
+//! This crate was created as sort of _storage_ for various components I found myself implementing,
+//! because they were missing from standard library.
 
 pub mod config_files;
 pub mod fs;
