@@ -1,7 +1,18 @@
 //! Signal handling utilities with RAII guards.
 //!
-//! Provides safe wrappers around libc signals with [`SignalKind`] for signal types
-//! and [`SignalGuard`] for temporary signal handler management.
+//! You can disable temporarily signals.
+//! ```rust,no_run
+//! # use rustvil::signals::{SignalKind, SignalGuard};
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn foo() -> Option<()> {
+//! let _guard = SignalGuard::ignore([SignalKind::term()])?;
+//! // Section with disabled SIGTERM.
+//! drop(_guard);
+//! # None
+//! # }
+//! # Ok(())
+//! # }
+//! ```
 
 use std::collections::HashMap;
 
@@ -18,7 +29,11 @@ macro_rules! impl_signal_delegates {
         ),*$(,)?
     ) => {
         $(
-            #[doc = concat!("Wrapper around `", stringify!($constant), "`.")]
+            #[doc = concat!("Wrapper around [`",
+            stringify!($constant),
+            "`](",
+            stringify!($constant),
+            ").")]
             pub const fn $name() -> Self {
                 Self($constant)
             }
@@ -162,6 +177,20 @@ impl Drop for SignalGuard {
             // SAFETY: Since action was created by previous call to `libc::signal`, it's safe to
             // restore it, and by `Self` invariant.
             let _ = unsafe { libc::signal(signal.as_raw() as libc::c_int, *action) };
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn basic_sigterm() {
+        let _guard = SignalGuard::ignore([SignalKind::term()]).unwrap();
+        unsafe {
+            let _ = libc::raise(SignalKind::term().as_raw());
         }
     }
 }

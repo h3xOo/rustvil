@@ -2,6 +2,9 @@
 //!
 //! Implements cross-platform path resolution following the XDG Base Directory spec,
 //! with platform-specific fallbacks for Windows and macOS.
+//!
+//! It was based on following spec: <https://specifications.freedesktop.org/basedir-spec/latest/#variables>, but it assumes Linux only.
+//! More granular description can be found here: <https://github.com/adrg/xdg/blob/master/README.md#xdg-base-directory>.
 
 use crate::os::env::Env;
 use std::path::PathBuf;
@@ -19,7 +22,13 @@ pub enum MacOSBehaviour {
 
 fn config_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     if cfg!(windows) {
-        env.get("LOCALAPPDATA").ok().map(PathBuf::from)
+        home()
+            .map(|mut home| {
+                home.push("AppData");
+                home.push("Local");
+                home
+            })
+            .or_else(|| env.get("LOCALAPPDATA").ok().map(PathBuf::from))
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
             home.push("Library");
@@ -36,11 +45,19 @@ fn config_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 
 fn cache_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     if cfg!(windows) {
-        env.get("LOCALAPPDATA").ok().map(|localappdata| {
-            let mut buf = PathBuf::from(localappdata);
-            buf.push("caches");
-            buf
-        })
+        home()
+            .map(|mut home| {
+                home.push("AppData");
+                home.push("Local");
+                home
+            })
+            .or_else(|| {
+                env.get("LOCALAPPDATA").ok().map(|localappdata| {
+                    let mut buf = PathBuf::from(localappdata);
+                    buf.push("caches");
+                    buf
+                })
+            })
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
             home.push("Library");
@@ -57,7 +74,13 @@ fn cache_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 
 fn data_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     if cfg!(windows) {
-        env.get("LOCALAPPDATA").ok().map(PathBuf::from)
+        home()
+            .map(|mut home| {
+                home.push("AppData");
+                home.push("Local");
+                home
+            })
+            .or_else(|| env.get("LOCALAPPDATA").ok().map(PathBuf::from))
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
             home.push("Library");
@@ -67,7 +90,7 @@ fn data_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     } else {
         home().map(|mut home| {
             home.push(".local");
-            home.push(".share");
+            home.push("share");
             home
         })
     }
@@ -75,7 +98,13 @@ fn data_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 
 fn state_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     if cfg!(windows) {
-        env.get("LOCALAPPDATA").ok().map(PathBuf::from)
+        home()
+            .map(|mut home| {
+                home.push("AppData");
+                home.push("Local");
+                home
+            })
+            .or_else(|| env.get("LOCALAPPDATA").ok().map(PathBuf::from))
     } else if cfg!(target_os = "macos") && matches!(behaviour, MacOSBehaviour::UseLibrary) {
         home().map(|mut home| {
             home.push("Library");
@@ -85,7 +114,7 @@ fn state_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     } else {
         home().map(|mut home| {
             home.push(".local");
-            home.push(".state");
+            home.push("state");
             home
         })
     }
@@ -97,8 +126,8 @@ fn state_fallback(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 ///
 /// Most of time it should be [`Some`] variant.
 /// [`None`] is returned if and only if:
-///     1. [`home`] returns `None`.
-///     2. `env` has no key `XDG_CONFIG_HOME`.
+/// 1. [`home`] returns `None` and `env` has no key `"LOCALAPPDATA"` (Windows only),
+/// 2. `env` has no key `"XDG_CONFIG_HOME"`.
 pub fn config(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     env.get("XDG_CONFIG_HOME")
         .ok()
@@ -112,8 +141,8 @@ pub fn config(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 ///
 /// Most of time it should be [`Some`] variant.
 /// [`None`] is returned if and only if:
-///     1. [`home`] returns `None`.
-///     2. `env` has no key `XDG_DATA_HOME`.
+/// 1. [`home`] returns `None` and `env` has no key `"LOCALAPPDATA"` (Windows only),
+/// 2. `env` has no key `"XDG_DATA_HOME"`.
 pub fn data(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     env.get("XDG_DATA_HOME")
         .ok()
@@ -127,8 +156,8 @@ pub fn data(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 ///
 /// Most of time it should be [`Some`] variant.
 /// [`None`] is returned if and only if:
-///     1. [`home`] returns `None`.
-///     2. `env` has no key `XDG_CACHE_HOME`.
+/// 1. [`home`] returns `None` and `env` has no key `"LOCALAPPDATA"` (Windows only),
+/// 2. `env` has no key `"XDG_CACHE_HOME"`.
 pub fn cache(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     env.get("XDG_CACHE_HOME")
         .ok()
@@ -141,8 +170,8 @@ pub fn cache(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
 ///
 /// Most of time it should be [`Some`] variant.
 /// [`None`] is returned if and only if:
-///     1. [`home`] returns `None`.
-///     2. `env` has no key `XDG_STATE_HOME`.
+/// 1. [`home`] returns `None` and `env` has no key `"LOCALAPPDATA"` (Windows only)
+/// 2. `env` has no key `"XDG_STATE_HOME"`.
 pub fn state(env: &Env, behaviour: MacOSBehaviour) -> Option<PathBuf> {
     env.get("XDG_STATE_HOME")
         .ok()
