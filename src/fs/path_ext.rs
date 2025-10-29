@@ -1,12 +1,11 @@
 use std::{
     fs::{
-        File, Metadata, OpenOptions, Permissions, ReadDir, canonicalize, copy, create_dir,
-        create_dir_all, exists, hard_link, metadata, read, read_dir, read_link, read_to_string,
-        remove_dir, remove_dir_all, remove_file, rename, set_permissions, symlink_metadata, write,
+        File, OpenOptions, Permissions, copy, create_dir, create_dir_all, hard_link, read,
+        read_to_string, remove_dir, remove_dir_all, remove_file, rename, set_permissions, write,
     },
     io::{self},
     ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 /// RAII guard, which calls [`(*self).unlock()`](std::fs::File::unlock) on drop.
@@ -62,7 +61,7 @@ pub enum ShouldBlock {
 ///
 /// Most of it are [`std::fs`] wrappers, changing from functional to OOP style, but there are some
 /// interesting methods.
-/// 
+///
 /// ```rust,no_run
 /// # use rustvil::fs::*;
 /// # use std::path::Path;
@@ -73,7 +72,7 @@ pub enum ShouldBlock {
 /// let _file = path.touch()?; // Creates file and its parent directories.
 /// path.rm()?;
 /// path.mkdir(MkdirOptions::WithParents)?;
-/// 
+///
 /// // You can also lock the file, to prevent races (even across different processes)
 /// let _guard = path.lock(ShouldBlock::Yes)?;
 /// // ...
@@ -182,29 +181,14 @@ pub trait PathExt: sealed::Sealed {
     /// `false`.
     fn is_executable(&self) -> bool;
 
-    /// Wrapper around [`std::fs::canonicalize`].
-    fn canonicalize(&self) -> io::Result<PathBuf>;
-
     /// Wrapper around [`std::fs::copy`].
     fn copy_to(&self, to: impl AsRef<Path>) -> io::Result<u64>;
-
-    /// Wrapper around [`std::fs::exists`].
-    fn exists(&self) -> io::Result<bool>;
 
     /// Wrapper around [`std::fs::hard_link`].
     fn hard_link_to(&self, to: impl AsRef<Path>) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::metadata`].
-    fn metadata(&self) -> io::Result<Metadata>;
-
     /// Wrapper around [`std::fs::read`].
     fn read(&self) -> io::Result<Vec<u8>>;
-
-    /// Wrapper around [`std::fs::read_dir`].
-    fn read_dir(&self) -> io::Result<ReadDir>;
-
-    /// Wrapper around [`std::fs::read_link`].
-    fn read_link(&self) -> io::Result<PathBuf>;
 
     /// Wrapper around [`std::fs::read_to_string`].
     fn read_to_string(&self) -> io::Result<String>;
@@ -223,9 +207,6 @@ pub trait PathExt: sealed::Sealed {
 
     /// Wrapper around [`std::fs::set_permissions`].
     fn set_permissions(&self, permissions: Permissions) -> io::Result<()>;
-
-    /// Wrapper around [`std::fs::symlink_metadata`].
-    fn symlink_metadata(&self) -> io::Result<Metadata>;
 
     /// Wrapper around [`std::fs::write`].
     fn write(&self, contents: impl AsRef<[u8]>) -> io::Result<()>;
@@ -309,36 +290,16 @@ impl PathExt for Path {
         false
     }
 
-    fn canonicalize(&self) -> io::Result<PathBuf> {
-        canonicalize(self)
-    }
-
     fn copy_to(&self, to: impl AsRef<Path>) -> io::Result<u64> {
         copy(self, to)
-    }
-
-    fn exists(&self) -> io::Result<bool> {
-        exists(self)
     }
 
     fn hard_link_to(&self, to: impl AsRef<Path>) -> io::Result<()> {
         hard_link(self, to)
     }
 
-    fn metadata(&self) -> io::Result<Metadata> {
-        metadata(self)
-    }
-
     fn read(&self) -> io::Result<Vec<u8>> {
         read(self)
-    }
-
-    fn read_dir(&self) -> io::Result<ReadDir> {
-        read_dir(self)
-    }
-
-    fn read_link(&self) -> io::Result<PathBuf> {
-        read_link(self)
     }
 
     fn read_to_string(&self) -> io::Result<String> {
@@ -363,10 +324,6 @@ impl PathExt for Path {
 
     fn set_permissions(&self, permissions: Permissions) -> io::Result<()> {
         set_permissions(self, permissions)
-    }
-
-    fn symlink_metadata(&self) -> io::Result<Metadata> {
-        symlink_metadata(self)
     }
 
     fn write(&self, contents: impl AsRef<[u8]>) -> io::Result<()> {
