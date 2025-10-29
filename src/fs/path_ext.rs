@@ -272,6 +272,7 @@ impl PathExt for Path {
         self.metadata()
             .map(|metadata| {
                 // Note: This should be the same as 0o111.
+                #[allow(clippy::unnecessary_cast)] // On macOS those are u16, on Linux they are u32.
                 const EXEC_MASK: u32 = (libc::S_IXUSR | libc::S_IXGRP | libc::S_IXOTH) as u32;
                 const _: () = assert!(EXEC_MASK == 0o111, "bits mismatch");
                 metadata.is_file() && metadata.permissions().mode() & EXEC_MASK != 0

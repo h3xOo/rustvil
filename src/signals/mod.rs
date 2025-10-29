@@ -161,7 +161,7 @@ impl SignalGuard {
             let old_handler = unsafe { libc::signal(signal.as_raw(), new_handler) };
             // Returns:
             //   Previous signal handler on success or SIG_ERR on failure (setting a signal handler can be disabled on some implementations).
-            if old_handler == libc::SIG_ERR {
+            if old_handler == libc::SIG_ERR as libc::sighandler_t {
                 return None;
             }
             // Otherwise `old_handler` is valid signal handler.
@@ -183,6 +183,7 @@ impl Drop for SignalGuard {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
