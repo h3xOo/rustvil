@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::io;
+use std::convert::Infallible;
 
 mod sealed {
     use std::process::Command;
@@ -9,24 +10,24 @@ mod sealed {
 
 /// Adds portable [`exec_replace`](CommandExt::exec_replace) to the [`Command`].
 pub trait CommandExt: sealed::Sealed {
-    // TODO: Replace with `io::Result<!>`, when `!` is stabilized.
+    // TODO: Replace `Infallible` with `!` when latter is stabilized.
     /// Replace current process with command from `Self` and execute it.
     /// 
     /// # Returns
-    /// [`Error`](io::Error) means, that spawning new command failed.
+    /// [`Err`](io::Error) variant means, that spawning new command failed.
     /// Otherwise this function shall never return.
-    fn exec_replace(&mut self) -> io::Error;
+    fn exec_replace(&mut self) -> io::Result<Infallible>;
 }
 
 impl CommandExt for Command {
     #[cfg(unix)]
-    fn exec_replace(&mut self) -> io::Error {
+    fn exec_replace(&mut self) -> io::Result<Infallible> {
         use std::os::unix::process::CommandExt;
-        self.exec()
+        Err(self.exec())
     }
 
     #[cfg(windows)]
-    fn exec_replace(&mut self) -> io::Error {
+    fn exec_replace(&mut self) -> io::Result<Infallible> {
         use windows_sys::core::BOOL;
         use windows_sys::Win32::Foundation::{FALSE, TRUE};
         use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
@@ -35,24 +36,15 @@ impl CommandExt for Command {
         }
         unsafe {
             if SetConsoleCtrlHandler(Some(handler), TRUE) == FALSE {
-                return io::Error::other("failed to overwrite ctrl-c handler");
+                return Err(io::Error::other("failed to overwrite ctrl-c handler"));
             }
         }
-        let child_exit = {
-            let child = match self.spawn() {
-                Ok(child) => child,
-                Err(e) => return e,
-            };
-            match child.wait() {
-                Ok(status) => status,
-                Err(e) => return e,
-            }
-        };
-        std::process::exit(child_exit.code().unwrap_or(1))
+        let status = self.spawn()?.wait()?;
+        std::process::exit(status.code().unwrap_or(1))
     }
 
     #[cfg(not(any(unix, windows)))]
-    fn exec_replace(&mut self) -> io::Error {
-       io::Error::other("implement `exec_replace`")
+    fn exec_replace(&mut self) -> io::Result<Infallible> {
+       Err(io::Error::other("implement `exec_replace`"))
     }
 }
