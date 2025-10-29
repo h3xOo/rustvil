@@ -1,5 +1,5 @@
 //! Operating system utilities and abstractions.
 
-pub mod env;
 mod command_ext;
+pub mod env;
 pub use command_ext::*;

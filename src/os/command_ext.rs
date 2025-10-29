@@ -1,6 +1,6 @@
-use std::process::Command;
-use std::io;
 use std::convert::Infallible;
+use std::io;
+use std::process::Command;
 
 mod sealed {
     use std::process::Command;
@@ -12,7 +12,7 @@ mod sealed {
 pub trait CommandExt: sealed::Sealed {
     // TODO: Replace `Infallible` with `!` when latter is stabilized.
     /// Replace current process with command from `Self` and execute it.
-    /// 
+    ///
     /// # Returns
     /// [`Err`](io::Error) variant means, that spawning new command failed.
     /// Otherwise this function shall never return.
@@ -28,9 +28,9 @@ impl CommandExt for Command {
 
     #[cfg(windows)]
     fn exec_replace(&mut self) -> io::Result<Infallible> {
-        use windows_sys::core::BOOL;
         use windows_sys::Win32::Foundation::{FALSE, TRUE};
         use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
+        use windows_sys::core::BOOL;
         unsafe extern "system" fn handler(_: u32) -> BOOL {
             TRUE
         }
@@ -45,6 +45,6 @@ impl CommandExt for Command {
 
     #[cfg(not(any(unix, windows)))]
     fn exec_replace(&mut self) -> io::Result<Infallible> {
-       Err(io::Error::other("implement `exec_replace`"))
+        Err(io::Error::other("implement `exec_replace`"))
     }
 }

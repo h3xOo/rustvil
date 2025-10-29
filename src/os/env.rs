@@ -1,24 +1,24 @@
 //! Cross-platform environment variables snapshot.
-//! 
+//!
 //! ## Examples
-//! 
+//!
 //! ```rust,no_run
 //! # use rustvil::os::env::Env;
 //! # use std::ffi::OsStr;
 //! let env = Env::new();
-//! 
+//!
 //! // Get some variable
 //! let foo = env.get_os("FOO").unwrap_or(OsStr::new("empty"));
-//! 
+//!
 //! // String getters also exist.
 //! let bar = env.get("BAR").unwrap_or("empty");
 //! ```
-//! 
+//!
 //! You can also _reload_ it:
 //! ```rust,no_run
 //! # use rustvil::os::env::Env;
 //! let mut env = Env::new();
-//! 
+//!
 //! let x = env.get("X"); // Maybe `Err`.
 //! unsafe { std::env::set_var("X", "Y"); }
 //! env.reload();

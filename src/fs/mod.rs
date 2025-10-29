@@ -1,11 +1,11 @@
 //! Filesystem utilities and extensions.
-//! 
+//!
 //! ## Extensions traits
-//! 
+//!
 //! Most interesting one is [`PathExt`].
 //! Most of it are [`std::fs`] wrappers, changing from functional to OOP style, but there are some
 //! interesting methods.
-//! 
+//!
 //! ```rust,no_run
 //! # use rustvil::fs::*;
 //! # use std::path::Path;
@@ -16,7 +16,7 @@
 //! let _file = path.touch()?; // Creates file and its parent directories.
 //! path.rm()?;
 //! path.mkdir(MkdirOptions::WithParents)?;
-//! 
+//!
 //! // You can also lock the file, to prevent races (even across different processes)
 //! let _guard = path.lock(ShouldBlock::Yes)?;
 //! // ...
