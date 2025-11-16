@@ -1,3 +1,8 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+#[cfg(feature = "full-canonicalize")]
+use std::path::PathBuf;
+
 use std::{
     fs::{
         File, OpenOptions, Permissions, copy, create_dir, create_dir_all, hard_link, read,
@@ -178,6 +183,19 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn lock_shared(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard>;
 
+    /// Canonicalize `self` fully: expand `~` into a `$HOME`, and resolve symlinks.
+    ///
+    /// Unlike [`std::fs::canonicalize`], this function __doesn't__ fail, if `self` points to
+    /// non-existing file.
+    ///
+    /// Also, because of the current implementation, this function will fail, if `self` is not an
+    /// `UTF-8` path.
+    ///
+    /// This function requires __full-canonicalize__ feature.
+    #[cfg(feature = "full-canonicalize")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "full-canonicalize")))]
+    fn full_canonicalize(&self) -> io::Result<PathBuf>;
+
     /// Returns `true` if path exists on a disk and points to an executable file.
     ///
     /// Current implementation only considers `unix` and `windows` cfg's, any other always returns
@@ -336,6 +354,17 @@ impl PathExt for Path {
 
     fn write(&self, contents: impl AsRef<[u8]>) -> io::Result<()> {
         write(self, contents)
+    }
+
+    #[cfg(feature = "full-canonicalize")]
+    fn full_canonicalize(&self) -> io::Result<PathBuf> {
+        use shellexpand::tilde;
+        use soft_canonicalize::soft_canonicalize;
+        let Some(as_str) = self.to_str() else {
+            return Err(io::Error::other("path is not an UTF-8 string"));
+        };
+        let expanded = tilde(as_str);
+        soft_canonicalize(expanded.into_owned())
     }
 }
 
