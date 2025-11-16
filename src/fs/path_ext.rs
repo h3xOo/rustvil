@@ -1,5 +1,3 @@
-#![cfg_attr(docsrs, feature(doc_cfg))]
-
 #[cfg(feature = "full-canonicalize")]
 use std::path::PathBuf;
 

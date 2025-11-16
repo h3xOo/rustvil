@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //! Rustvil - A collection of various Rust utilities.
 //!
 //! Look at documentation of each submodule for more verbose documentation.
