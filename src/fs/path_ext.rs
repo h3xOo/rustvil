@@ -108,6 +108,9 @@ pub trait PathExt: sealed::Sealed {
     /// [`Ok(())`](Ok) if created successfully, otherwise error, as reported by
     /// [`create_dir`], or [`create_dir_all`].
     ///
+    /// Note that this function will return `Ok(())`, if [`create_dir`] returns `Err` with kind
+    /// [`ErrorKind::AlreadyExists`](io::ErrorKind::AlreadyExists).
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -234,9 +237,13 @@ impl PathExt for Path {
     }
 
     fn mkdir(&self, opts: MkdirOptions) -> io::Result<()> {
-        match opts {
+        let result = match opts {
             MkdirOptions::WithoutParents => create_dir(self),
             MkdirOptions::WithParents => create_dir_all(self),
+        };
+        match result {
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+            _ => result,
         }
     }
 
@@ -338,6 +345,7 @@ mod tests {
     use claim::{assert_err, assert_ok};
     use tempfile::tempdir;
 
+    use std::io::{Read, Write};
     use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::Duration;
@@ -349,6 +357,20 @@ mod tests {
         let mut new_file = tmp.path().to_path_buf();
         new_file.push("x");
         assert_ok!(new_file.touch());
+    }
+
+    #[test]
+    fn multiple_touch() {
+        let tmp = tempdir().expect("needed for tests");
+        let mut new_file = tmp.path().to_path_buf();
+        new_file.push("x");
+        let mut file = new_file.touch().unwrap();
+        file.write_all("test".as_bytes()).unwrap();
+        let mut new_handle = new_file.touch().unwrap();
+        let mut content = String::new();
+        let read_bytes = new_handle.read_to_string(&mut content).unwrap();
+        assert_eq!(read_bytes, 4);
+        assert_eq!(content, "test");
     }
 
     #[test]
@@ -382,6 +404,27 @@ mod tests {
             new_file.push("y");
             assert_err!(new_file.mkdir(MkdirOptions::WithoutParents));
         }
+    }
+
+    #[test]
+    fn mkdir_doesnt_screw_paths() {
+        let tmp = tempdir().expect("needed for tests");
+        let mut new_file = tmp.path().to_path_buf();
+        let mut copy = new_file.clone();
+        let mut copy2 = new_file.clone();
+        new_file.push("x");
+        new_file.push("y");
+        assert_ok!(new_file.mkdir(MkdirOptions::WithParents));
+        assert_ok!(new_file.mkdir(MkdirOptions::WithoutParents));
+        copy.push("x");
+        copy.push("file");
+        copy2.push("x");
+        assert_ok!(copy.touch());
+        assert_ok!(copy2.mkdir(MkdirOptions::WithParents));
+        assert_ok!(copy2.mkdir(MkdirOptions::WithoutParents));
+        assert!(copy.exists());
+        assert!(copy2.exists());
+        assert!(new_file.exists());
     }
 
     #[test]
