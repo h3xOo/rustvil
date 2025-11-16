@@ -1,6 +1,6 @@
 [package]
 name = "rustvil"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Rustvil, a collection of various Rust utilities"
@@ -8,6 +8,8 @@ repository = "https://github.com/h3xOo/rustvil"
 
 [dependencies]
 libc = "0.2.174"
+shellexpand = { version = "3.1.1", optional = true }
+soft-canonicalize = { version = "0.4.5", optional = true }
 thiserror = "2.0.12"
 
 [dev-dependencies]
@@ -16,3 +18,13 @@ tempfile = "3.20.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [ "Win32_Foundation", "Win32_System_Console"] }
+
+[features]
+full-canonicalize = ["dep:shellexpand", "dep:soft-canonicalize"]
+
+# docs.rs-specific configuration
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
