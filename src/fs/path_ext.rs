@@ -1,4 +1,4 @@
-#[cfg(feature = "full-canonicalize")]
+#[cfg(any(feature = "full-resolve", feature = "expand-user"))]
 use std::path::PathBuf;
 
 use std::{
@@ -11,7 +11,7 @@ use std::{
     path::Path,
 };
 
-/// RAII guard, which calls [`(*self).unlock()`](std::fs::File::unlock) on drop.
+/// A RAII guard, which calls [`(*self).unlock()`](std::fs::File::unlock) on a drop.
 #[derive(Debug)]
 pub struct FileLockGuard {
     file: File,
@@ -37,12 +37,12 @@ impl DerefMut for FileLockGuard {
     }
 }
 
-/// Options for controlling [`PathExt::mkdir`]
+/// Options for controlling the [`PathExt::mkdir`]
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum MkdirOptions {
-    /// Equivalent of `mkdir $path`.
+    /// Equivalent of the `mkdir $path`.
     WithoutParents,
-    /// Equivalent of `mkdir -p $path`.
+    /// Equivalent of the `mkdir -p $path`.
     WithParents,
 }
 
@@ -53,16 +53,16 @@ mod sealed {
     impl Sealed for Path {}
 }
 
-/// Whether [`PathExt::lock`]/[`PathExt::lock_shared`] should block the current thread.
+/// Whether the [`PathExt::lock`]/[`PathExt::lock_shared`] should block the current thread.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum ShouldBlock {
     No,
     Yes,
 }
 
-/// Extension trait for [`Path`] with additional filesystem operations.
+/// Extension trait for the [`Path`] with additional filesystem operations.
 ///
-/// Most of it are [`std::fs`] wrappers, changing from functional to OOP style, but there are some
+/// Most of it are [`std::fs`] wrappers, changing from a functional to an OOP style, but there are some
 /// interesting methods.
 ///
 /// ```rust,no_run
@@ -72,11 +72,11 @@ pub enum ShouldBlock {
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let path: &Path = get_path();
 /// // Now you can do extra things like:
-/// let _file = path.touch()?; // Creates file and its parent directories.
+/// let _file = path.touch()?; // Creates a file and its parent directories.
 /// path.rm()?;
 /// path.mkdir(MkdirOptions::WithParents)?;
 ///
-/// // You can also lock the file, to prevent races (even across different processes)
+/// // You can also lock the file, to prevent any races (even across different processes)
 /// let _guard = path.lock(ShouldBlock::Yes)?;
 /// // ...
 /// drop(_guard);
@@ -85,11 +85,11 @@ pub enum ShouldBlock {
 /// # Ok(())
 /// # }
 pub trait PathExt: sealed::Sealed {
-    /// Touch file and its parent directories.
+    /// Touch the file and its parent directories.
     ///
     /// # Returns
-    /// [`Ok(File)`](std::fs::File) if created successfully, otherwise error, as reported by
-    /// [`PathExt::mkdir`] or [`OpenOptions::open`].
+    /// [`Ok(File)`](std::fs::File) if created successfully, otherwise an error, as reported by
+    /// the [`PathExt::mkdir`] or the [`OpenOptions::open`].
     ///
     /// # Examples
     ///
@@ -108,8 +108,8 @@ pub trait PathExt: sealed::Sealed {
     /// Create directories at given [`Path`].
     ///
     /// # Returns
-    /// [`Ok(())`](Ok) if created successfully, otherwise error, as reported by
-    /// [`create_dir`], or [`create_dir_all`].
+    /// [`Ok(())`](Ok) if created successfully, otherwise an error, as reported by
+    /// the [`create_dir`], or the [`create_dir_all`].
     ///
     /// Note that this function will return `Ok(())`, if [`create_dir`] returns `Err` with kind
     /// [`ErrorKind::AlreadyExists`](io::ErrorKind::AlreadyExists).
@@ -128,12 +128,12 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn mkdir(&self, opts: MkdirOptions) -> io::Result<()>;
 
-    /// Locks exclusively `self`, creating file if needed.
+    /// Locks exclusively `self`, creating a file if needed.
     ///
     /// This is essentially [`self.touch()?`](PathExt::touch) followed by [`File::lock`]/[`File::try_lock`], with RAII bloat.
     ///
     /// # Returns
-    /// [`Ok(FileLockGuard)`](FileLockGuard) on success.
+    /// [`Ok(FileLockGuard)`](FileLockGuard) on a success.
     ///
     /// # Examples
     ///
@@ -155,12 +155,12 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn lock(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard>;
 
-    /// Locks shared `self`, creating file if needed.
+    /// Locks shared `self`, creating a file if needed.
     ///
     /// This is essentially [`self.touch()?`](PathExt::touch) followed by [`File::lock_shared`]/[`File::try_lock_shared`], with RAII bloat.
     ///
     /// # Returns
-    /// [`Ok(FileLockGuard)`](FileLockGuard) on success.
+    /// [`Ok(FileLockGuard)`](FileLockGuard) on a success.
     ///
     /// # Examples
     ///
@@ -181,18 +181,48 @@ pub trait PathExt: sealed::Sealed {
     /// ```
     fn lock_shared(&self, should_block: ShouldBlock) -> io::Result<FileLockGuard>;
 
-    /// Canonicalize `self` fully: expand `~` into a `$HOME`, and resolve symlinks.
+    /// Resolve `self` fully, as best as possible.
     ///
-    /// Unlike [`std::fs::canonicalize`], this function __doesn't__ fail, if `self` points to
+    /// Unlike [`std::fs::canonicalize`], this function __doesn't__ fail, if `self` points to a
     /// non-existing file.
     ///
-    /// Also, because of the current implementation, this function will fail, if `self` is not an
+    /// This function requires the __full-resolve__ feature.
+    #[cfg(feature = "full-resolve")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "full-resolve")))]
+    fn resolve(&self) -> io::Result<PathBuf>;
+
+    /// Canonicalize `self` fully: expand `~` into the `$HOME`.
+    ///
+    /// Also, because of the current implementation, this function will fail, if `self` is not a
     /// `UTF-8` path.
     ///
-    /// This function requires __full-canonicalize__ feature.
-    #[cfg(feature = "full-canonicalize")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "full-canonicalize")))]
-    fn full_canonicalize(&self) -> io::Result<PathBuf>;
+    /// This function requires the __expand-user__ feature.
+    #[cfg(feature = "expand-user")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "expand-user")))]
+    fn expand_user(&self) -> io::Result<PathBuf>;
+
+    /// Canonicalize `self` fully: expand `~` into a `home`.
+    ///
+    /// Also, because of the current implementation, this function will fail, if `self` is not a
+    /// `UTF-8` path.
+    ///
+    /// This function requires the __expand-user__ feature.
+    #[cfg(feature = "expand-user")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "expand-user")))]
+    fn expand_user_with(&self, home: impl AsRef<str>) -> io::Result<PathBuf>;
+
+    /// Canonicalize `self` fully: expand `~` into a `home()`.
+    ///
+    /// Also, because of the current implementation, this function will fail, if `self` is not a
+    /// `UTF-8` path.
+    ///
+    /// This function requires the __expand-user__ feature.
+    #[cfg(feature = "expand-user")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "expand-user")))]
+    fn expand_user_with_fn<F, H>(&self, home: F) -> io::Result<PathBuf>
+    where
+        H: AsRef<str>,
+        F: FnOnce() -> H;
 
     /// Returns `true` if path exists on a disk and points to an executable file.
     ///
@@ -200,34 +230,34 @@ pub trait PathExt: sealed::Sealed {
     /// `false`.
     fn is_executable(&self) -> bool;
 
-    /// Wrapper around [`std::fs::copy`].
+    /// A wrapper around [`std::fs::copy`].
     fn copy_to(&self, to: impl AsRef<Path>) -> io::Result<u64>;
 
-    /// Wrapper around [`std::fs::hard_link`].
+    /// A wrapper around [`std::fs::hard_link`].
     fn hard_link_to(&self, to: impl AsRef<Path>) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::read`].
+    /// A wrapper around [`std::fs::read`].
     fn read(&self) -> io::Result<Vec<u8>>;
 
-    /// Wrapper around [`std::fs::read_to_string`].
+    /// A wrapper around [`std::fs::read_to_string`].
     fn read_to_string(&self) -> io::Result<String>;
 
-    /// Wrapper around [`std::fs::rename`].
+    /// A wrapper around [`std::fs::rename`].
     fn rename_to(&self, to: impl AsRef<Path>) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_file`].
+    /// A wrapper around [`std::fs::remove_file`].
     fn rm(&self) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_dir`].
+    /// A wrapper around [`std::fs::remove_dir`].
     fn rmdir(&self) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::remove_dir_all`].
+    /// A wrapper around [`std::fs::remove_dir_all`].
     fn rmtree(&self) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::set_permissions`].
+    /// A wrapper around [`std::fs::set_permissions`].
     fn set_permissions(&self, permissions: Permissions) -> io::Result<()>;
 
-    /// Wrapper around [`std::fs::write`].
+    /// A wrapper around [`std::fs::write`].
     fn write(&self, contents: impl AsRef<[u8]>) -> io::Result<()>;
 }
 
@@ -354,15 +384,39 @@ impl PathExt for Path {
         write(self, contents)
     }
 
-    #[cfg(feature = "full-canonicalize")]
-    fn full_canonicalize(&self) -> io::Result<PathBuf> {
-        use shellexpand::tilde;
+    #[cfg(feature = "full-resolve")]
+    fn resolve(&self) -> io::Result<PathBuf> {
         use soft_canonicalize::soft_canonicalize;
+        soft_canonicalize(self)
+    }
+
+    #[cfg(feature = "expand-user")]
+    fn expand_user(&self) -> io::Result<PathBuf> {
+        use shellexpand::tilde;
         let Some(as_str) = self.to_str() else {
             return Err(io::Error::other("path is not an UTF-8 string"));
         };
-        let expanded = tilde(as_str);
-        soft_canonicalize(expanded.into_owned())
+        Ok(PathBuf::from(tilde(as_str).into_owned()))
+    }
+
+    #[cfg(feature = "expand-user")]
+    fn expand_user_with(&self, home: impl AsRef<str>) -> io::Result<PathBuf> {
+        self.expand_user_with_fn(|| home)
+    }
+
+    #[cfg(feature = "expand-user")]
+    fn expand_user_with_fn<F, H>(&self, home: F) -> io::Result<PathBuf>
+    where
+        H: AsRef<str>,
+        F: FnOnce() -> H,
+    {
+        use shellexpand::tilde_with_context;
+        let Some(as_str) = self.to_str() else {
+            return Err(io::Error::other("path is not an UTF-8 string"));
+        };
+        Ok(PathBuf::from(
+            tilde_with_context(as_str, || Some(home())).into_owned(),
+        ))
     }
 }
 
