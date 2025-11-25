@@ -1,6 +1,6 @@
 [package]
 name = "rustvil"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Rustvil, a collection of various Rust utilities"
@@ -20,7 +20,9 @@ tempfile = "3.20.0"
 windows-sys = { version = "0.61", features = [ "Win32_Foundation", "Win32_System_Console"] }
 
 [features]
-full-canonicalize = ["dep:shellexpand", "dep:soft-canonicalize"]
+full = ["expand-user", "full-resolve"]
+expand-user = ["dep:shellexpand"]
+full-resolve = ["dep:soft-canonicalize"]
 
 # docs.rs-specific configuration
 [package.metadata.docs.rs]
