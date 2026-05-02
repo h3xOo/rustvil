@@ -72,7 +72,7 @@ jobs:
           toolchain: stable
           components: rustfmt
       - name: cargo-semver-checks
-        uses: obi1kenobi/cargo-semver-checks-action@v2.8
+        uses: obi1kenobi/cargo-semver-checks-action@v2.9
   hack:
     # cargo-hack checks combinations of feature flags to ensure that features are all additive
     # which is required for feature unification
