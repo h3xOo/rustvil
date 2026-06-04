@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> As of 4th of June 2026 this repository is archived and is read-only.
+
 # Rustvil, a collection of various Rust utilities
 
 This crate is a result of working on various projects: it collects a lot of different (but useful) utilities.
